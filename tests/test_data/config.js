@@ -2,14 +2,14 @@
 const config = {
   // AWS credentials (fake)
   aws: {
-    accessKeyId: 'AKIAIOSFODNN7EXAMPLE',
-    secretAccessKey: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'
+    accessKeyId: 'AKIAI_placeholder',
+    secretAccessKey: 'wJalrXU_placeholder'
   },
 
   // Stripe keys (fake)
   stripe: {
-    publicKey: 'pk_test_51ABC123xyz789fakekey123',
-    secretKey: 'sk_test_51ABC123xyz789fakekey456'
+    publicKey: 'pk_test_5_placeholder',
+    secretKey: 'sk_test_5_placeholder'
   },
 
   // Database URL (fake)
@@ -23,5 +23,5 @@ const config = {
   },
 
   // Generic API key (fake)
-  apiKey: 'abc123def456ghi789jkl012mno345pqr678stu901'
+  apiKey: 'abc123def456gh_placeholder'
 };
