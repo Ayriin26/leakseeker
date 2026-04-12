@@ -1,70 +1,165 @@
-# LeakSeeker 🔍
+<div align="center">
 
-A CLI tool to find hardcoded secrets and API keys in your codebase.
-
-## Features
-
-- 🔍 **Pattern-based detection** for common secret types (AWS, Stripe, JWT, etc.)
-- 🎯 **Entropy analysis** to detect random strings that could be secrets
-- 📚 **Git history scanning** to find secrets in previous commits
-- 🎨 **Colored output** with risk-level indicators
-- 📊 **Multiple output formats** (text, JSON, CSV)
-- ⚡ **Fast scanning** with intelligent file filtering
-
-## Installation
-
-```bash
-# Install from source
-git clone <repository>
-cd leakseeker
-pip install -e .
-
-# Or install directly
-pip install leakseeker
+```
+██╗     ███████╗ █████╗ ██╗  ██╗███████╗███████╗███████╗██╗  ██╗███████╗██████╗ 
+██║     ██╔════╝██╔══██╗██║ ██╔╝██╔════╝██╔════╝██╔════╝██║ ██╔╝██╔════╝██╔══██╗
+██║     █████╗  ███████║█████╔╝ ███████╗█████╗  █████╗  █████╔╝ █████╗  ██████╔╝
+██║     ██╔══╝  ██╔══██║██╔═██╗ ╚════██║██╔══╝  ██╔══╝  ██╔═██╗ ██╔══╝  ██╔══██╗
+███████╗███████╗██║  ██║██║  ██╗███████║███████╗███████╗██║  ██╗███████╗██║  ██║
+╚══════╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝
 ```
 
-## Usage
+**Find hardcoded secrets before they find you.**
+
+[![Python](https://img.shields.io/badge/Python-3.7+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE.txt)
+[![Security](https://img.shields.io/badge/Purpose-Security-red?style=for-the-badge&logo=shield&logoColor=white)](https://github.com/Ayriin26/leakseeker)
+[![Status](https://img.shields.io/badge/Status-Active-brightgreen?style=for-the-badge)](https://github.com/Ayriin26/leakseeker)
+
+</div>
+
+---
+
+## 🔥 What is LeakSeeker?
+
+LeakSeeker is a **fast, zero-dependency CLI tool** that hunts down hardcoded secrets, API keys, and credentials lurking in your codebase — before attackers do.
+
+Whether it's an AWS key you forgot about, a Stripe secret left in a config file, or a JWT token buried in git history — LeakSeeker finds it.
+
+---
+
+## ⚡ Features
+
+| Feature | Description |
+|---|---|
+| 🎯 **Pattern Detection** | 11+ built-in patterns for AWS, Stripe, GitHub, Slack, JWT, and more |
+| 🧠 **Entropy Analysis** | Catches secrets that don't match any pattern using Shannon entropy |
+| 📜 **Git History Scan** | Finds secrets in old commits — even ones that were "deleted" |
+| 🎨 **Color-coded Output** | Risk levels highlighted: 💀 Critical, ⚠️ High, Medium, Low |
+| 📊 **Multiple Formats** | Text, JSON, and CSV output |
+| 🚀 **Fast** | Skips binaries, `node_modules`, `.git`, and other noise automatically |
+| 🛡️ **False Positive Filtering** | Smart filtering to cut through placeholder and example values |
+
+---
+
+## 🚀 Installation
+
 ```bash
-# Basic scan
+# Clone the repo
+git clone https://github.com/Ayriin26/leakseeker.git
+cd leakseeker
+
+# Install
+pip install -e .
+```
+
+---
+
+## 🛠️ Usage
+
+```bash
+# Scan a project
 leakseeker /path/to/your/project
 
-# Verbose output with JSON format
-leakseeker /path/to/project --verbose --output json
+# Verbose mode — shows the full line where the secret was found
+leakseeker /path/to/project --verbose
 
-# Scan including git history
-leakseeker /path/to/project --git-history
+# JSON output — great for piping into other tools
+leakseeker /path/to/project --output json
 
-# Save results to CSV
+# CSV output — save to a file for reporting
 leakseeker /path/to/project --output csv > results.csv
 
-# Disable colored output
+# Also scan git history (finds deleted secrets too)
+leakseeker /path/to/project --git-history
+
+# No color (for CI environments)
 leakseeker /path/to/project --no-color
 ```
 
-## Supported Secret Types
-- AWS Access Keys & Secret Keys
-- Stripe API Keys
-- Database Connection Strings
-- JWT Secrets
-- OAuth Tokens
-- GitHub Tokens
-- Slack API Tokens
-- Generic API Keys
-- SMTP Passwords
-- High-entropy strings
+---
 
-## Exit Codes
-- 0: No secrets found
-- 1: Secrets found (low/medium/high risk)
-- 2: Critical secrets found
-- 130: User interrupted
-- 1: Error during scan
+## 🔍 What It Detects
 
-## Contributing
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new patterns
-4. Submit a pull request
+```
+💀 CRITICAL          ⚠️  HIGH              🔵 MEDIUM
+─────────────────    ─────────────────    ─────────────────
+AWS Access Keys      Database URLs        OAuth Tokens
+AWS Secret Keys      JWT Secrets          High-entropy strings
+Stripe API Keys      GitHub Tokens
+Crypto Private Keys  Slack Tokens
+                     SMTP Passwords
+                     Generic API Keys
+```
 
-## License
-MIT
+---
+
+## 📸 Example Output
+
+```
+🔍 Scan Results:
+   Critical: 2, High: 4, Medium: 2, Low: 0
+   Total: 8 potential secrets found
+
+💀 CRITICAL: AWS Secret Access Key
+   Type: aws_secret_key
+   File: config/settings.py:21
+   Match: AWS_SECRET_ACCESS_KEY = 'wJalrXUtnFEMI/K7MDENG/...'
+
+💀 CRITICAL: Stripe API Key
+   Type: stripe_key
+   File: config/settings.py:19
+   Match: sk_live_51ABC123xyz789...
+
+⚠️ HIGH: Database Connection URL with credentials
+   Type: database_url
+   File: .env:2
+   Match: postgres://admin:password@localhost:5432/prod
+```
+
+---
+
+## 🚦 Exit Codes
+
+| Code | Meaning |
+|---|---|
+| `0` | ✅ Clean — no secrets found |
+| `1` | ⚠️ Secrets found (low / medium / high risk) |
+| `2` | 💀 Critical secrets found |
+| `130` | Scan interrupted by user |
+
+---
+
+## 🗂️ Supported File Types
+
+`.py` `.js` `.ts` `.jsx` `.tsx` `.java` `.php` `.rb` `.go` `.rs` `.cpp` `.c` `.h` `.html` `.xml` `.json` `.yml` `.yaml` `.env` `.config` `.txt` `.md`
+
+> Files inside `node_modules`, `.git`, `__pycache__`, `dist`, `build`, and `vendor` are automatically skipped.
+
+---
+
+## 🤝 Contributing
+
+Got a new secret pattern to add? Found a bug? PRs are welcome.
+
+1. Fork the repo
+2. Create a branch: `git checkout -b feature/new-pattern`
+3. Add your pattern in `leakseeker/patterns.py`
+4. Test it against `tests/test_data/`
+5. Open a pull request
+
+---
+
+## 📄 License
+
+MIT — free to use, modify, and distribute.
+
+---
+
+<div align="center">
+
+Made with 🔐 by [Ayriin26](https://github.com/Ayriin26)
+
+*Don't leak secrets. Use LeakSeeker.*
+
+</div>
