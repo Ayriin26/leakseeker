@@ -21,6 +21,11 @@ RISK_ICONS = {
 
 RISK_ORDER = ['critical', 'high', 'medium', 'low']
 
+TYPE_LABELS = {
+    'endpoint': 'Endpoint',
+    'high_entropy_string': 'High Entropy String',
+}
+
 
 class TextReporter:
     def __init__(self, use_color=True):
@@ -31,7 +36,6 @@ class TextReporter:
             print("✅ No secrets found!")
             return
 
-        # Sort by risk → confidence
         results_sorted = sorted(
             results,
             key=lambda r: (
@@ -40,7 +44,6 @@ class TextReporter:
             )
         )
 
-        # Summary
         summary = {level: 0 for level in RISK_ORDER}
         for r in results:
             summary[r.get('risk_level', 'low')] += 1
@@ -52,7 +55,7 @@ class TextReporter:
             f"Medium: {summary['medium']}, "
             f"Low: {summary['low']}"
         )
-        print(f"   Total: {len(results)} potential secrets found\n")
+        print(f"   Total: {len(results)} potential findings\n")
 
         for result in results_sorted:
             self.print_result(result, verbose)
@@ -72,37 +75,48 @@ class TextReporter:
 
         icon = RISK_ICONS.get(result.get('risk_level'), '⚠️')
 
+        type_name = TYPE_LABELS.get(
+            result.get('secret_type', ''),
+            result.get('secret_type', '')
+        )
+
         print(f"{color}{icon} {result.get('risk_level', '').upper()}{reset}")
-        print(f"   Type       : {result.get('secret_type', '')}")
+        print(f"   Type       : {type_name}")
         print(f"   Location   : {result.get('file', '')}:{result.get('line_number', '')}")
 
         if result.get('in_git_history'):
             print("   📝 Found in Git History")
 
-        # Confidence
         print(f"   Confidence : {result.get('confidence', 'N/A')}%")
 
-        # Redacted match
         matched = result.get('matched_text', '')
-        if len(matched) > 16:
-            display = matched[:6] + '...' + matched[-4:]
+        secret_type = result.get('secret_type', '')
+
+        # ✅ Type-aware redaction
+        if secret_type == 'endpoint':
+            display = matched
         else:
-            display = matched[:4] + '...'
+            if len(matched) > 16:
+                display = matched[:6] + '...' + matched[-4:]
+            else:
+                display = matched[:4] + '...'
+
         print(f"   Match      : {display}")
 
         if verbose:
             line = result.get('line_content', '')
             print(f"   Line       : {line[:120]}{'...' if len(line) > 120 else ''}")
 
-        # AI Explanation
-        ai_text = generate_ai_explanation(
-            result.get("secret_type"),
-            result.get("matched_text")
-        )
+        # ✅ AI only for secrets
+        if secret_type != 'endpoint':
+            ai_text = generate_ai_explanation(
+                result.get("secret_type"),
+                result.get("matched_text")
+            )
 
-        print("\n   🧠 Analysis:")
-        for line in ai_text.split('\n'):
-            print(f"   {line}")
+            print("\n   🧠 Analysis:")
+            for line in ai_text.split('\n'):
+                print(f"   {line}")
 
         print("-" * 60)
 
@@ -131,9 +145,9 @@ class CSVReporter:
         if not results:
             return
 
-        def redact(value: str) -> str:
-            if not value:
-                return ""
+        def redact(value: str, secret_type: str) -> str:
+            if secret_type == 'endpoint':
+                return value
             if len(value) > 16:
                 return value[:6] + "..." + value[-4:]
             return value[:4] + "..."
@@ -141,7 +155,10 @@ class CSVReporter:
         safe_results = []
         for r in results:
             r_copy = r.copy()
-            r_copy['matched_text'] = redact(r_copy.get('matched_text', ''))
+            r_copy['matched_text'] = redact(
+                r_copy.get('matched_text', ''),
+                r_copy.get('secret_type', '')
+            )
             safe_results.append(r_copy)
 
         writer = csv.DictWriter(sys.stdout, fieldnames=self.FIELDS, extrasaction='ignore')

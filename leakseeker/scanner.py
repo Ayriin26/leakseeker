@@ -7,12 +7,14 @@ from typing import List, Dict, Any, Generator, Set
 from .filters import is_valid_secret
 from .patterns import get_patterns
 from .detectors import EntropyDetector
+from .endpoint_detector import EndpointDetector
 
 
 class SecretScanner:
     def __init__(self):
         self.patterns = get_patterns()
         self.entropy_detector = EntropyDetector()
+        self.endpoint_detector = EndpointDetector()
 
         self.ignored_dirs = {
             '.git', 'node_modules', '__pycache__', '.venv', 'venv',
@@ -29,7 +31,6 @@ class SecretScanner:
         self._seen: Set[tuple] = set()
 
     def scan(self, path: Path, scan_git_history: bool = False) -> List[Dict[str, Any]]:
-        """Scan a file or directory for secrets"""
         results = []
         self._seen.clear()
 
@@ -40,34 +41,23 @@ class SecretScanner:
                 results.extend(self.scan_file(file_path))
 
         if scan_git_history and (path / '.git').exists():
-            git_results = self.scan_git_history(path)
-            results.extend(git_results)
+            results.extend(self.scan_git_history(path))
 
         return results
 
     def walk_directory(self, directory: Path) -> Generator[Path, None, None]:
-        """Walk through directory, skipping ignored paths"""
         for root, dirs, files in os.walk(directory):
-            dirs[:] = [
-                d for d in dirs
-                if d not in self.ignored_dirs and not d.startswith('.')
-            ]
+            dirs[:] = [d for d in dirs if d not in self.ignored_dirs and not d.startswith('.')]
 
             for file in files:
                 file_path = Path(root) / file
-
-                if (
-                    file_path.suffix in self.supported_extensions
-                    or file_path.name.startswith('.env')
-                ):
+                if file_path.suffix in self.supported_extensions or file_path.name.startswith('.env'):
                     yield file_path
 
     def scan_file(self, file_path: Path) -> List[Dict[str, Any]]:
-        """Scan a single file for secrets"""
         results = []
 
         try:
-            # Increased size limit
             if file_path.stat().st_size > 2_000_000:
                 return results
         except OSError:
@@ -75,29 +65,25 @@ class SecretScanner:
 
         try:
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-
                 for line_num, line in enumerate(f, 1):
 
-                    # Skip binary-like content
                     if '\x00' in line:
                         continue
 
-                    line_lower = line.lower()
-
-                    # Skip obvious test/dummy lines
-                    if any(x in line_lower for x in ['test', 'example', 'dummy']):
-                        continue
-
-                    # =========================
-                    # 🔍 Pattern-based detection
-                    # =========================
+                    # -------------------------
+                    # Secret detection
+                    # -------------------------
                     for pattern in self.patterns:
                         for match in pattern.pattern.finditer(line):
 
-                            if not self.is_valid_match(match, pattern.name):
+                            matched_text = self.extract_match_value(match)
+                            lower_val = matched_text.lower()
+
+                            if any(x in lower_val for x in ['test', 'example', 'dummy']):
                                 continue
 
-                            matched_text = self.extract_match_value(match)
+                            if not self.is_valid_match(match, pattern.name):
+                                continue
 
                             dedup_key = (str(file_path), pattern.name, matched_text)
                             if dedup_key in self._seen:
@@ -106,11 +92,7 @@ class SecretScanner:
                             self._seen.add(dedup_key)
 
                             entropy = self.entropy_detector.shannon_entropy(matched_text)
-
-                            confidence = min(
-                                100,
-                                int(entropy * 10 + len(set(matched_text)) * 2)
-                            )
+                            confidence = min(100, int(entropy * 10 + len(set(matched_text)) * 2))
 
                             results.append({
                                 'file': str(file_path),
@@ -124,41 +106,33 @@ class SecretScanner:
                                 'in_git_history': False
                             })
 
-                    # =========================
-                    # 🔍 Entropy-based detection
-                    # =========================
-                    entropy_matches = self.entropy_detector.detect_high_entropy(line)
+                    # -------------------------
+                    # Endpoint detection
+                    # -------------------------
+                    endpoints = self.endpoint_detector.detect(line)
 
-                    for high_entropy_string in entropy_matches:
+                    confidence_map = {"high": 80, "medium": 60, "low": 40}
 
-                        if not is_valid_secret(high_entropy_string):
-                            continue
+                    for ep in endpoints:
+                        value = ep["value"]
 
-                        dedup_key = (str(file_path), 'high_entropy_string', high_entropy_string)
-
+                        dedup_key = (str(file_path), "endpoint", value)
                         if dedup_key in self._seen:
                             continue
 
                         self._seen.add(dedup_key)
 
-                        entropy = self.entropy_detector.shannon_entropy(high_entropy_string)
-
-                        confidence = min(100, int(entropy * 12))
-
                         results.append({
                             'file': str(file_path),
                             'line_number': line_num,
                             'line_content': line.strip(),
-                            'secret_type': 'high_entropy_string',
-                            'description': 'High entropy string (possible secret)',
-                            'risk_level': 'medium',
-                            'confidence': confidence,
-                            'matched_text': high_entropy_string,
+                            'secret_type': 'endpoint',
+                            'description': 'Exposed web endpoint',
+                            'risk_level': ep["risk"],
+                            'confidence': confidence_map.get(ep["risk"], 50),
+                            'matched_text': value,
                             'in_git_history': False
                         })
-
-        except (PermissionError, IsADirectoryError):
-            pass
 
         except Exception as e:
             print(f"Warning: failed to scan {file_path}: {e}", file=sys.stderr)
@@ -166,7 +140,6 @@ class SecretScanner:
         return results
 
     def scan_git_history(self, repo_path: Path) -> List[Dict[str, Any]]:
-        """Scan git history for secrets"""
         results = []
 
         try:
@@ -174,61 +147,48 @@ class SecretScanner:
                 ['git', 'log', '--pretty=format:%H'],
                 cwd=repo_path,
                 capture_output=True,
-                text=True,
-                timeout=30
+                text=True
             )
 
             if result.returncode != 0:
                 return results
 
-            commit_hashes = result.stdout.strip().split('\n')
+            commits = result.stdout.strip().split('\n')
 
-            for commit in commit_hashes[:50]:
-                diff_result = subprocess.run(
+            for commit in commits[:50]:
+                diff = subprocess.run(
                     ['git', 'show', commit],
                     cwd=repo_path,
                     capture_output=True,
-                    text=True,
-                    timeout=15
+                    text=True
                 )
 
-                if diff_result.returncode != 0:
-                    continue
+                content = diff.stdout
 
-                diff_content = diff_result.stdout
+                endpoints = self.endpoint_detector.detect(content)
+                confidence_map = {"high": 80, "medium": 60, "low": 40}
 
-                for pattern in self.patterns:
-                    for match in pattern.pattern.finditer(diff_content):
+                for ep in endpoints:
+                    value = ep["value"]
 
-                        if not self.is_valid_match(match, pattern.name):
-                            continue
+                    dedup_key = (f'git:{commit[:8]}', 'endpoint', value)
+                    if dedup_key in self._seen:
+                        continue
 
-                        matched_text = self.extract_match_value(match)
+                    self._seen.add(dedup_key)
 
-                        dedup_key = (f'git:{commit[:8]}', pattern.name, matched_text)
-                        if dedup_key in self._seen:
-                            continue
+                    results.append({
+                        'file': f'git:{commit[:8]}',
+                        'line_number': 0,
+                        'line_content': 'Endpoint found in git history',
+                        'secret_type': 'endpoint',
+                        'description': 'Exposed endpoint (in git history)',
+                        'risk_level': ep["risk"],
+                        'confidence': confidence_map.get(ep["risk"], 50),
+                        'matched_text': value,
+                        'in_git_history': True
+                    })
 
-                        self._seen.add(dedup_key)
-
-                        entropy = self.entropy_detector.shannon_entropy(matched_text)
-
-                        confidence = min(100, int(entropy * 10))
-
-                        results.append({
-                            'file': f'git:{commit[:8]}',
-                            'line_number': 0,
-                            'line_content': 'Found in git history',
-                            'secret_type': pattern.name,
-                            'description': f'{pattern.description} (in git history)',
-                            'risk_level': pattern.risk_level,
-                            'confidence': confidence,
-                            'matched_text': matched_text,
-                            'in_git_history': True
-                        })
-
-        except subprocess.TimeoutExpired:
-            return results
         except Exception:
             return results
 
@@ -236,38 +196,8 @@ class SecretScanner:
 
     @staticmethod
     def extract_match_value(match: Any) -> str:
-        """Extract best captured value"""
         groups = [g for g in match.groups() if g]
-        if groups:
-            return groups[-1].strip()
-        return match.group().strip()
+        return groups[-1].strip() if groups else match.group().strip()
 
     def is_valid_match(self, match: Any, pattern_name: str) -> bool:
-        matched_text = match.group()
-
-        if self.is_false_positive(matched_text, pattern_name):
-            return False
-
         return is_valid_secret(self.extract_match_value(match))
-
-    @staticmethod
-    def is_false_positive(matched_text: str, pattern_name: str) -> bool:
-        """Filter out obvious false positives"""
-        exact_fp = {
-            'example', 'test', 'demo', 'sample', 'placeholder',
-            'fake', '000000', '123456', 'abcdef', 'changeme'
-        }
-
-        lower = matched_text.lower()
-
-        if lower in exact_fp:
-            return True
-
-        placeholder_markers = (
-            '_placeholder', 'your_secret', 'your_key', 'changeme', 'xxxx', '<', '>'
-        )
-
-        if any(marker in lower for marker in placeholder_markers):
-            return True
-
-        return False
