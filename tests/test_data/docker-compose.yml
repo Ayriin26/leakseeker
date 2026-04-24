@@ -1,0 +1,60 @@
+# docker-compose.yml
+# ⚠️  DEMO FILE: Intentionally contains hardcoded secrets for leakseeker demo
+
+version: "3.9"
+
+services:
+
+  app:
+    build: .
+    ports:
+      - "0.0.0.0:3000:3000"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: "postgresql://superadmin:Tr0ub4dor&3SecretPass@postgres:5432/app_production"
+      MONGO_URI: "mongodb+srv://dbAdmin:xK9!mP2qR7vZ@cluster0.xyz.mongodb.net/prod"
+      REDIS_URL: "redis://:R3d!sP@ssw0rd2024@redis:6379"
+      JWT_SECRET: "8f42a73054b1749f8f58848be5e6502c5a4d9b7e3d6f1a9b4c2e0d8f7a1b3c5d"
+      JWT_REFRESH_SECRET: "9a3b5c7d1e2f4a6b8c0d2e4f6a8b0c2d4e6f8a0b2c4d6e8f0a2b4c6d8e0f2a4"
+      AWS_ACCESS_KEY_ID: "AKIAIOSFODNN7EXAMPLE"
+      AWS_SECRET_ACCESS_KEY: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY1"
+      STRIPE_SECRET_KEY: "sk_live_51Hh3YrKZ5q2eXaMpLeKeyAbcDeFgHiJkLmNoPqRsTuVwXyZ12"
+      STRIPE_WEBHOOK_SECRET: "whsec_xK9mP2qR7vZd3F1nL8oT5sY6wE0jaBcDeFgH"
+      GITHUB_TOKEN: "ghp_R8xN3kPqZ7vT2mYwL9dF4jA6sQ1nE5oB0cI"
+      SLACK_BOT_TOKEN: "xoxb-17653672481-19874698323-pdFZKVeTuq8kWZngrg3gEED0"
+      SENDGRID_API_KEY: "SG.xK9mP2qR7vZd3F1nL8oT.5sY6wE0jaBcDeFgHiJkLmNoPqRsTuVwXyZ1234"
+      GOOGLE_API_KEY: "AIzaSyD-9tSrke72I6e9E8d7X3kY8mN0pQ2wR4v"
+      SMTP_PASSWORD: "EmailP@ssw0rd!2024Secure"
+      OAUTH_TOKEN: "ya29.a0AfH6SMBxN3kPqZ7vT2mYwL9dF4jA6sQ1nE5oBcD"
+      INTERNAL_API_URL: "http://10.0.1.50:8080/internal/api/v1"
+      ADMIN_URL: "http://0.0.0.0:9000/admin"
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: superadmin
+      POSTGRES_PASSWORD: Tr0ub4dor&3SecretPass
+      POSTGRES_DB: app_production
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7
+    command: redis-server --requirepass R3d!sP@ssw0rd2024
+    ports:
+      - "6379:6379"
+
+  nginx:
+    image: nginx:latest
+    ports:
+      - "0.0.0.0:80:80"
+      - "0.0.0.0:443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+
+  debug-panel:
+    image: debug-tools:latest
+    ports:
+      - "0.0.0.0:9001:9001"   # 🔴 Debug panel exposed on all interfaces
+    environment:
+      ADMIN_PASSWORD: DebugAdm!n2024

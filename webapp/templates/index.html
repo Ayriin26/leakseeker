@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LeakSeeker — Secret Scanner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+
+  <!-- Scanline overlay -->
+  <div class="scanlines"></div>
+
+  <!-- Grid background -->
+  <div class="grid-bg"></div>
+
+  <div class="page-wrap">
+
+    <!-- Header -->
+    <header class="site-header">
+      <div class="logo-block">
+        <span class="logo-icon">⬡</span>
+        <div>
+          <span class="logo-text">LEAK<span class="accent">SEEKER</span></span>
+          <span class="logo-sub">// secret detection engine v1.0</span>
+        </div>
+      </div>
+      <nav class="header-links">
+        <span class="status-dot"></span>
+        <span class="status-label">SYSTEM READY</span>
+      </nav>
+    </header>
+
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-group">
+          {% for category, message in messages %}
+            <div class="flash flash--{{ category }}">
+              <span class="flash-icon">{{ '⚠' if category == 'error' else 'ℹ' }}</span>
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hero-eyebrow">
+        <span class="blink-cursor">_</span> Exposing what hides in plain sight
+      </div>
+      <h1 class="hero-title">
+        Find hardcoded<br/>
+        <em>secrets</em> before<br/>
+        attackers do.
+      </h1>
+      <p class="hero-desc">
+        Scan codebases for leaked API keys, tokens, credentials, database URLs,
+        private keys — and exposed internal endpoints. Works on files, directories, and git history.
+      </p>
+    </section>
+
+    <!-- Scan Form -->
+    <section class="scan-panel">
+      <div class="panel-header">
+        <span class="panel-dot red"></span>
+        <span class="panel-dot yellow"></span>
+        <span class="panel-dot green"></span>
+        <span class="panel-title">// scan_target.configure()</span>
+      </div>
+
+      <form action="/scan" method="POST" enctype="multipart/form-data" id="scan-form">
+
+        <!-- Mode Toggle -->
+        <div class="mode-toggle">
+          <button type="button" class="mode-btn active" data-mode="upload" onclick="setMode('upload')">
+            ↑ Upload Files
+          </button>
+          <button type="button" class="mode-btn" data-mode="path" onclick="setMode('path')">
+            ⌘ Local Path
+          </button>
+          <button type="button" class="mode-btn" data-mode="github" onclick="setMode('github')">
+            ⬡ GitHub Repo
+          </button>
+        </div>
+        <input type="hidden" name="scan_mode" id="scan_mode" value="upload" />
+
+        <!-- Upload Mode -->
+        <div class="input-group" id="upload-section">
+          <label class="field-label">TARGET FILES OR ARCHIVE
+            <span class="field-hint">— select multiple files at once</span>
+          </label>
+          <div class="drop-zone" id="drop-zone">
+            <div class="drop-icon">⬡</div>
+            <div class="drop-text">Drop files or <label for="upload_file" class="drop-link">browse</label></div>
+            <div class="drop-hint">Supports .py, .js, .env, .json, .zip, and more — multiple files allowed</div>
+            <input type="file" name="upload_file" id="upload_file" class="file-input" accept="*/*" multiple />
+          </div>
+          <div class="file-list" id="file-list" style="display:none">
+            <div class="file-list-header">
+              <span class="file-list-count" id="file-list-count"></span>
+              <button type="button" class="clear-file" onclick="clearFiles()">✕ Clear all</button>
+            </div>
+            <ul class="file-list-items" id="file-list-items"></ul>
+          </div>
+        </div>
+
+        <!-- Path Mode -->
+        <div class="input-group" id="path-section" style="display:none">
+          <label class="field-label" for="directory_path">LOCAL DIRECTORY OR FILE PATH</label>
+          <div class="text-input-wrap">
+            <span class="input-prefix">$</span>
+            <input
+              type="text"
+              name="directory_path"
+              id="directory_path"
+              class="text-input"
+              placeholder="/path/to/your/project"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </div>
+        </div>
+
+        <!-- GitHub Mode -->
+        <div class="input-group" id="github-section" style="display:none">
+          <label class="field-label" for="github_url">GITHUB REPOSITORY URL</label>
+          <div class="text-input-wrap">
+            <span class="input-prefix">⬡</span>
+            <input
+              type="text"
+              name="github_url"
+              id="github_url"
+              class="text-input"
+              placeholder="https://github.com/owner/repo"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </div>
+          <div class="github-hint">
+            <span class="hint-icon">ℹ</span>
+            Public repositories only. The repo will be cloned temporarily for scanning.
+          </div>
+        </div>
+
+        <!-- Options Row -->
+        <div class="options-row">
+          <div class="option-group">
+            <label class="field-label" for="min_risk">MINIMUM RISK LEVEL</label>
+            <div class="select-wrap">
+              <select name="min_risk" id="min_risk" class="select-input">
+                <option value="low">Low — Show all findings</option>
+                <option value="medium">Medium — Skip low noise</option>
+                <option value="high">High — Only critical/high</option>
+                <option value="critical">Critical — Severe only</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="option-group">
+            <label class="field-label">OPTIONS</label>
+            <div class="checkbox-group">
+              <label class="checkbox-label">
+                <input type="checkbox" name="scan_git_history" id="scan_git_history" class="checkbox-input" />
+                <span class="checkbox-custom"></span>
+                Scan git history (last 50 commits)
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Submit -->
+        <button type="submit" class="scan-btn" id="scan-btn">
+          <span class="btn-icon">⬡</span>
+          <span class="btn-text">RUN SCAN</span>
+          <span class="btn-loader" style="display:none">
+            <span class="spinner"></span> Scanning...
+          </span>
+        </button>
+
+      </form>
+    </section>
+
+    <!-- Feature Strip -->
+    <section class="features">
+      <div class="feature-card">
+        <div class="feature-icon">🔑</div>
+        <div class="feature-title">20+ Secret Types</div>
+        <div class="feature-desc">AWS, GitHub, Stripe, JWT, DB URLs, OAuth, SMTP, private keys & more</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📡</div>
+        <div class="feature-title">Endpoint Detection</div>
+        <div class="feature-desc">Surfaces exposed internal routes: /admin, /debug, /internal, dev ports</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🧠</div>
+        <div class="feature-title">Entropy Analysis</div>
+        <div class="feature-desc">Shannon entropy scoring catches high-randomness strings missed by patterns</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📜</div>
+        <div class="feature-title">Git History</div>
+        <div class="feature-desc">Scans the last 50 commits — secrets deleted from code still live in history</div>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      <span>LeakSeeker // Built with Python + Flask</span>
+      <span>MIT License</span>
+    </footer>
+
+  </div>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
