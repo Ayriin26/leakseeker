@@ -9,6 +9,27 @@ from typing import List, Dict, Any
 from leakseeker.scanner import SecretScanner
 
 RISK_ORDER = ['low', 'medium', 'high', 'critical']
+BLOCKED_UPLOAD_EXTENSIONS = {'.mp3', '.mp4', '.gif', '.png', '.jpeg', '.jpg'}
+
+def is_blocked_file(filename: str) -> bool:
+    return Path(filename or '').suffix.lower() in BLOCKED_UPLOAD_EXTENSIONS
+
+def validate_uploads(uploaded_files) -> None:
+    blocked = sorted({f.filename for f in uploaded_files if is_blocked_file(f.filename)})
+    if blocked:
+        raise ValueError('Blocked upload file type: ' + ', '.join(blocked))
+
+def _extract_zip_checked(zip_path: Path, extract_dir: Path) -> None:
+    with zipfile.ZipFile(zip_path, 'r') as zf:
+        blocked = sorted({info.filename for info in zf.infolist() if not info.is_dir() and is_blocked_file(info.filename)})
+        if blocked:
+            raise ValueError('Blocked file type inside zip: ' + ', '.join(blocked[:5]))
+        for info in zf.infolist():
+            target = (extract_dir / info.filename).resolve()
+            if not str(target).startswith(str(extract_dir.resolve())):
+                raise ValueError('Unsafe path inside zip archive.')
+            zf.extract(info, extract_dir)
+
 
 
 def run_scan(
@@ -53,6 +74,8 @@ def extract_upload(uploaded_file) -> Path:
     """Save and optionally unzip an uploaded file to a temp dir. Returns path to scan."""
     tmp_dir = Path(tempfile.mkdtemp(prefix='leakseeker_'))
     filename = uploaded_file.filename
+    if is_blocked_file(filename):
+        raise ValueError(f'Blocked upload file type: {filename}')
 
     dest = tmp_dir / filename
     uploaded_file.save(str(dest))
@@ -60,8 +83,7 @@ def extract_upload(uploaded_file) -> Path:
     if filename.endswith('.zip'):
         extract_dir = tmp_dir / 'extracted'
         extract_dir.mkdir()
-        with zipfile.ZipFile(dest, 'r') as zf:
-            zf.extractall(extract_dir)
+        _extract_zip_checked(dest, extract_dir)
         dest.unlink()
         return extract_dir
 
@@ -82,23 +104,27 @@ def extract_uploads(uploaded_files) -> Path:
     """Save multiple uploaded files into a single temp directory for scanning."""
     tmp_dir = Path(tempfile.mkdtemp(prefix='leakseeker_'))
 
-    for uploaded_file in uploaded_files:
-        filename = uploaded_file.filename
-        dest = tmp_dir / filename
-        uploaded_file.save(str(dest))
+    try:
+        for uploaded_file in uploaded_files:
+            filename = uploaded_file.filename
+            if is_blocked_file(filename):
+                raise ValueError(f'Blocked upload file type: {filename}')
+            dest = tmp_dir / filename
+            uploaded_file.save(str(dest))
 
-        if filename.endswith('.zip'):
-            extract_dir = tmp_dir / (filename + '_extracted')
-            extract_dir.mkdir()
-            try:
-                with zipfile.ZipFile(dest, 'r') as zf:
-                    zf.extractall(extract_dir)
-                dest.unlink()
-            except zipfile.BadZipFile:
-                pass  # Leave the file as-is if not a valid zip
+            if filename.endswith('.zip'):
+                extract_dir = tmp_dir / (filename + '_extracted')
+                extract_dir.mkdir()
+                try:
+                    _extract_zip_checked(dest, extract_dir)
+                    dest.unlink()
+                except zipfile.BadZipFile:
+                    pass  # Leave the file as-is if not a valid zip
+    except Exception:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        raise
 
     return tmp_dir
-
 
 def clone_github_repo(github_url: str) -> Path:
     """Clone a public GitHub repository to a temp dir for scanning."""
@@ -133,3 +159,5 @@ def clone_github_repo(github_url: str) -> Path:
         raise RuntimeError("Cloning timed out. The repository may be too large.")
 
     return tmp_dir / 'repo'
+
+

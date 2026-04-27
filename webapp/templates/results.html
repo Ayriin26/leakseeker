@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LeakSeeker — Scan Results</title>
+  <title>LeakSeeker -- Scan Results</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
@@ -19,11 +19,7 @@
     <header class="site-header">
       <div class="logo-block">
         <a href="/" class="logo-link">
-          <span class="logo-icon">⬡</span>
-          <div>
-            <span class="logo-text">LEAK<span class="accent">SEEKER</span></span>
-            <span class="logo-sub">// secret detection engine v1.0</span>
-          </div>
+          <img class="logo-img" src="{{ url_for('static', filename='assets/leakseeker-logo.png') }}" alt="LeakSeeker" />
         </a>
       </div>
       <a href="/" class="new-scan-btn">+ New Scan</a>
@@ -73,7 +69,7 @@
           {% endif %}
           {% if total == 0 %}
           <div class="chip chip--clean">
-            <span class="chip-count">✓</span>
+            <span class="chip-count">OK</span>
             <span class="chip-label">CLEAN</span>
           </div>
           {% endif %}
@@ -86,7 +82,7 @@
     {% if total == 0 %}
     <!-- Clean result -->
     <section class="clean-result">
-      <div class="clean-icon">✓</div>
+      <div class="clean-icon">OK</div>
       <div class="clean-title">No secrets found</div>
       <div class="clean-desc">The scan completed without detecting any hardcoded secrets, tokens, or risky endpoints.</div>
       <a href="/" class="scan-btn scan-btn--inline">Run another scan</a>
@@ -127,7 +123,7 @@
 
         <div class="finding-body">
           <div class="finding-type">
-            {% if f.secret_type == 'endpoint' %}📡{% elif f.risk_level == 'critical' %}💀{% elif f.risk_level == 'high' %}🔴{% elif f.risk_level == 'medium' %}🟡{% else %}🟢{% endif %}
+            {% if f.secret_type == 'endpoint' %}[ENDPOINT]{% elif f.risk_level == 'critical' %}[CRIT]{% elif f.risk_level == 'high' %}[HIGH]{% elif f.risk_level == 'medium' %}[MED]{% else %}[LOW]{% endif %}
             {{ f.secret_type | replace('_', ' ') | title }}
             {% if f.in_git_history %}
             <span class="git-tag">GIT HISTORY</span>
@@ -135,7 +131,7 @@
           </div>
 
           <div class="finding-location">
-            <span class="location-icon">⌘</span>
+            <span class="location-icon">$</span>
             {{ f.file }}{% if f.line_number %}:{{ f.line_number }}{% endif %}
           </div>
 
@@ -146,9 +142,9 @@
               {% if f.secret_type == 'endpoint' %}
                 {{ m }}
               {% elif m|length > 16 %}
-                {{ m[:6] }}••••{{ m[-4:] }}
+                {{ m[:6] }}****{{ m[-4:] }}
               {% else %}
-                {{ m[:4] }}•••
+                {{ m[:4] }}***
               {% endif %}
             </code>
           </div>
@@ -156,7 +152,7 @@
           {% if f.line_content %}
           <div class="finding-line">
             <span class="line-label">LINE:</span>
-            <code class="line-value">{{ f.line_content[:120] }}{% if f.line_content|length > 120 %}…{% endif %}</code>
+            <code class="line-value">{{ f.line_content[:120] }}{% if f.line_content|length > 120 %}...{% endif %}</code>
           </div>
           {% endif %}
         </div>
@@ -165,7 +161,7 @@
           <button class="ai-btn"
                   onclick="loadExplanation(this, '{{ f.secret_type }}', '{{ f.matched_text | replace("'", "\\'") }}')"
                   title="AI Analysis">
-            🧠 Explain
+            [AI] Explain
           </button>
           <div class="ai-panel" style="display:none">
             <div class="ai-content"></div>

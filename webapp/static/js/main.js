@@ -1,5 +1,18 @@
-/* LeakSeeker — main.js */
-
+/* LeakSeeker main.js */
+const BLOCKED_UPLOAD_EXTENSIONS = new Set(['.mp3', '.mp4', '.gif', '.png', '.jpeg', '.jpg']);
+function uploadExt(name) {
+  const i = (name || '').lastIndexOf('.');
+  return i >= 0 ? name.slice(i).toLowerCase() : '';
+}
+function blockedUploads(files) {
+  return Array.from(files || []).filter(f => BLOCKED_UPLOAD_EXTENSIONS.has(uploadExt(f.name)));
+}
+function rejectBlockedUploads(files) {
+  const blocked = blockedUploads(files);
+  if (!blocked.length) return false;
+  alert('Blocked file type: ' + blocked.map(f => f.name).join(', '));
+  return true;
+}
 // ============================================================
 // Mode toggle (upload vs path)
 // ============================================================
@@ -49,7 +62,7 @@ function setMode(mode) {
   });
 
   fileInput.addEventListener('change', () => {
-    if (fileInput.files.length) showFileList(fileInput.files);
+    if (fileInput.files.length) { if (rejectBlockedUploads(fileInput.files)) { clearFiles(); return; } showFileList(fileInput.files); }
   });
 })();
 
@@ -71,7 +84,7 @@ function showFileList(files) {
     const li = document.createElement('li');
     li.className = 'file-list-item';
     const sizeKB = (f.size / 1024).toFixed(1);
-    li.innerHTML = `<span class="file-item-icon">📄</span><span class="file-item-name">${f.name}</span><span class="file-item-size">${sizeKB} KB</span>`;
+    li.innerHTML = `<span class="file-item-icon">[FILE]</span><span class="file-item-name">${f.name}</span><span class="file-item-size">${sizeKB} KB</span>`;
     listItems.appendChild(li);
   });
 }
@@ -87,13 +100,15 @@ function clearFiles() {
 }
 
 // ============================================================
-// Scan form — loading state
+// Scan form -- loading state
 // ============================================================
 (function initScanForm() {
   const form = document.getElementById('scan-form');
   if (!form) return;
 
-  form.addEventListener('submit', () => {
+  form.addEventListener('submit', e => {
+    const fileInput = document.getElementById('upload_file');
+    if (fileInput && fileInput.files && rejectBlockedUploads(fileInput.files)) { e.preventDefault(); return; }
     const btn = document.getElementById('scan-btn');
     if (!btn) return;
     const btnText = btn.querySelector('.btn-text');
@@ -107,7 +122,7 @@ function clearFiles() {
 })();
 
 // ============================================================
-// Results — filter by risk level or type
+// Results -- filter by risk level or type
 // ============================================================
 let activeFilter = 'all';
 let searchTerm = '';
@@ -169,7 +184,7 @@ async function loadExplanation(btn, secretType, matchedText) {
   // Toggle off
   if (panel.style.display !== 'none') {
     panel.style.display = 'none';
-    btn.textContent = '🧠 Explain';
+    btn.textContent = '[AI] Explain';
     return;
   }
 
@@ -190,7 +205,7 @@ async function loadExplanation(btn, secretType, matchedText) {
   } catch (err) {
     content.textContent = 'Could not load explanation.';
   } finally {
-    btn.textContent = '🧠 Explain';
+    btn.textContent = '[AI] Explain';
     btn.disabled = false;
   }
 }

@@ -5,7 +5,7 @@ from flask import (
     url_for, flash, jsonify, session
 )
 
-from webapp.services import run_scan, extract_upload, extract_uploads, clone_github_repo, cleanup_temp
+from webapp.services import run_scan, extract_upload, extract_uploads, clone_github_repo, cleanup_temp, validate_uploads
 from leakseeker.ai_helper import generate_ai_explanation
 
 
@@ -50,6 +50,7 @@ def register_routes(app):
                 if not files:
                     flash('Please select one or more files to upload.', 'error')
                     return redirect(url_for('index'))
+                validate_uploads(files)
                 scan_path = extract_uploads(files)
                 temp_path = scan_path
 
@@ -114,3 +115,4 @@ def register_routes(app):
             'total': session.get('last_total', 0),
             'risk_score': session.get('last_risk_score', 0),
         })
+

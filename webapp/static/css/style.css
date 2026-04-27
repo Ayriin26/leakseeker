@@ -104,12 +104,15 @@ body {
   gap: 12px;
   text-decoration: none;
   color: inherit;
+  min-width: 0;
 }
 
-.logo-icon {
-  font-size: 2rem;
-  color: var(--accent);
-  animation: pulse-glow 3s ease-in-out infinite;
+
+.logo-img {
+  height: 48px;
+  width: auto;
+  display: block;
+  filter: drop-shadow(0 0 14px rgba(124,92,255,0.18));
 }
 
 .logo-text {
@@ -1034,3 +1037,16 @@ form { padding: 28px; }
   color: var(--accent);
   font-size: 0.8rem;
 }
+
+/* READABILITY OVERRIDES */
+html { font-size: 16.5px; }
+body { font-size: 1rem; }
+.logo-sub,.status-label,.panel-title,.field-label,.drop-hint,.file-list-count,.file-item-size,.github-hint,.results-path,.risk-meter-label,.chip-label,.filter-label,.filter-btn,.finding-badge,.finding-conf,.git-tag,.match-label,.line-label,.ai-btn,.ai-panel,.site-footer,.feature-desc,.total-count,.filter-search,.finding-location,.finding-match,.finding-line,.line-value { font-size: 0.86rem !important; }
+.mode-btn,.drop-text,.text-input,.select-input,.checkbox-label,.scan-btn,.feature-title,.finding-type,.match-value,.clean-desc,.no-results-msg,.file-list-item { font-size: 0.96rem !important; }
+.hero-desc { font-size: 1rem; }
+.results-hero { font-size: 1rem; }
+.finding-card { grid-template-columns: 96px 1fr auto; }
+.finding-card, .results-hero, .scan-panel, .feature-card { line-height: 1.72; }
+.filter-btn { padding: 8px 13px; }
+.filter-search { padding: 8px 13px; width: 230px; }
+.ai-btn { padding: 8px 13px; }
